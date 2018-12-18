@@ -1,6 +1,7 @@
-(def VERSION (.trim (slurp "VERSION")))
+;;(def VERSION (.trim (slurp "VERSION")))
 
-(defproject com.rpl/specter VERSION
+;;(defproject com.rpl/specter VERSION
+(defproject com.rpl/specter "1.1.3-SNAPSHOT"
   :jvm-opts ["-XX:-OmitStackTraceInFastThrow"] ; this prevents JVM from doing optimizations which can remove stack traces from NPE and other exceptions
              ;"-agentpath:/Applications/YourKit_Java_Profiler_2015_build_15056.app/Contents/Resources/bin/mac/libyjpagent.jnilib"]
 
@@ -16,9 +17,10 @@
                        com.rpl.specter.zipper
                        com.rpl.specter.protocols
                        com.rpl.specter.transients]
-          :source-uri
-            {#"target/classes" "https://github.com/nathanmarz/specter/tree/{version}/src/clj/{classpath}x#L{line}"
-             #".*"             "https://github.com/nathanmarz/specter/tree/{version}/src/clj/{classpath}#L{line}"}}
+          ;;:source-uri
+          ;;  {#"target/classes" "https://github.com/nathanmarz/specter/tree/{version}/src/clj/{classpath}x#L{line}"
+          ;;   #".*"             "https://github.com/nathanmarz/specter/tree/{version}/src/clj/{classpath}#L{line}"}
+         }
 
 
   :cljsbuild {:builds [{:id "test-build"
