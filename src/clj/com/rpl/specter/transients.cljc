@@ -2,9 +2,9 @@
   #?(:cljs
      (:require-macros [com.rpl.specter
                        :refer
-                       [defnav]]))
-  (:use #?(:clj
-           [com.rpl.specter :only
+                       [defnav]])
+     :default
+     (:use [com.rpl.specter :only
             [defnav]]))
   (:require [com.rpl.specter.navs :as n]
             [com.rpl.specter :refer [subselect selected?]]))
@@ -57,8 +57,13 @@
   "Navigates to the last element of a transient vector."
   (n/PosNavigator t-get-last t-update-last))
 
-#?(
-   :clj
+#?(:cljs
+   (defn- select-keys-from-transient-map
+     "Uses select-keys on a transient map."
+     [m m-keys]
+     (select-keys m m-keys))
+
+   :default
    (defn- select-keys-from-transient-map
      "Selects keys from transient map, because built-in select-keys uses
   `find` which is unsupported."
@@ -73,13 +78,7 @@
            (recur (if-not (identical? item ::not-found)
                     (assoc result k item)
                     result)
-                  (rest m-keys))))))
-
-   :cljs
-   (defn- select-keys-from-transient-map
-     "Uses select-keys on a transient map."
-     [m m-keys]
-     (select-keys m m-keys)))
+                  (rest m-keys)))))))
 
 
 (defnav

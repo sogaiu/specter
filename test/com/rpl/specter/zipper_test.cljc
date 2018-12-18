@@ -13,10 +13,20 @@
     #?(:clj [com.rpl.specter.test-helpers :only [for-all+]])
     #?(:clj [com.rpl.specter
              :only [declarepath providepath select select-one select-one!
-                    select-first transform setval replace-in]]))
+                    select-first transform setval replace-in]])
+    #?@(:cljr
+        [[clojure.test :only [deftest is]]
+         [clojure.test.check.clojure-test :only [defspec]]
+         [com.rpl.specter.test-helpers :only [for-all+]]
+         [com.rpl.specter
+          :only [declarepath providepath select select-one select-one!
+                select-first transform setval replace-in]]]))
 
   (:require #?(:clj [clojure.test.check.generators :as gen])
             #?(:clj [clojure.test.check.properties :as prop])
+            #?@(:cljr
+                [[clojure.test.check.generators :as gen]
+                 [clojure.test.check.properties :as prop]])
             #?(:cljs [clojure.test.check :as tc])
             #?(:cljs [clojure.test.check.generators :as gen])
             #?(:cljs [clojure.test.check.properties :as prop :include-macros true])

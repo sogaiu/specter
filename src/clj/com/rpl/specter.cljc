@@ -25,11 +25,15 @@
   #?(:cljs (:refer-clojure :exclude [NONE]))
 
   (:use [com.rpl.specter.protocols :only [ImplicitNav RichNavigator]]
-    #?(:clj [com.rpl.specter.util-macros :only [doseqres]]))
+    #?(:clj [com.rpl.specter.util-macros :only [doseqres]]
+       :cljr [com.rpl.specter.util-macros :only [doseqres]]))
   (:require [com.rpl.specter.impl :as i]
             [com.rpl.specter.navs :as n]
             #?(:clj [clojure.walk :as cljwalk])
             #?(:clj [com.rpl.specter.macros :as macros])
+            #?@(:cljr
+                [[clojure.walk :as cljwalk]
+                 [com.rpl.specter.macros :as macros]])
             [clojure.set :as set]))
 
 (defn- static-path? [path]
@@ -51,7 +55,10 @@
             ret
             ))))
 
-#?(:clj
+
+#?(:cljs 'nothing
+
+   :default
    (do
 
      (defmacro defmacroalias [name target]
@@ -168,7 +175,7 @@
            ;; var-get doesn't work in cljs, so capture the val in the macro instead
            `(com.rpl.specter.impl/->VarUse
               ~path
-              ~(if-not (instance? Class (resolve path)) `(var ~path))
+              ~(if-not (instance? #?(:clj Class :cljr Object) (resolve path)) `(var ~path))
               (quote ~path)))
 
 
@@ -261,7 +268,8 @@
 
              get-cache-code (if (= platform :clj)
                               `(try (i/get-cell ~cache-sym)
-                                    (catch ClassCastException e#
+                                    (catch #?(:clj ClassCastException
+                                              :cljr InvalidCastException) e#
                                       ;; With AOT compilation it's possible for:
                                       ;; Thread 1: unbound, so throw exception
                                       ;; Thread 2: unbound, so throw exception
@@ -1189,39 +1197,53 @@
   ImplicitNav
   (implicit-nav [this] STAY))
 
-(extend-type #?(:clj clojure.lang.Keyword :cljs cljs.core/Keyword)
+(extend-type #?(:cljs cljs.core/Keyword :default clojure.lang.Keyword)
   ImplicitNav
   (implicit-nav [this] (n/keypath* this)))
 
-(extend-type #?(:clj clojure.lang.Symbol :cljs cljs.core/Symbol)
+(extend-type #?(:cljs cljs.core/Symbol :default clojure.lang.Symbol)
   ImplicitNav
   (implicit-nav [this] (n/keypath* this)))
 
-(extend-type #?(:clj String :cljs string)
+(extend-type #?(:cljs string :default String)
   ImplicitNav
   (implicit-nav [this] (n/keypath* this)))
 
-(extend-type #?(:clj Number :cljs number)
-  ImplicitNav
-  (implicit-nav [this] (n/keypath* this)))
+#?(:cljr
+   'sadly-Number-does-not-work
 
-(extend-type #?(:clj Character :cljs char)
-  ImplicitNav
-  (implicit-nav [this] (n/keypath* this)))
+   :default
+   (extend-type #?(:clj Number :cljs number)
+     ImplicitNav
+     (implicit-nav [this] (n/keypath* this))))
 
-(extend-type #?(:clj Boolean :cljs boolean)
-  ImplicitNav
-  (implicit-nav [this] (n/keypath* this)))
+#?(:cljr
+   'sadly-Character-does-not-work
 
-(extend-type #?(:clj clojure.lang.AFn :cljs function)
+   :default
+   (extend-type #?(:clj Character :cljs char)
+     ImplicitNav
+     (implicit-nav [this] (n/keypath* this))))
+
+#?(:cljr
+   'sadly-Boolean-does-not-work
+
+   :default
+   (extend-type #?(:clj Boolean :cljs boolean)
+     ImplicitNav
+     (implicit-nav [this] (n/keypath* this))))
+
+(extend-type #?(:cljs function :default clojure.lang.AFn)
   ImplicitNav
   (implicit-nav [this] (pred this)))
 
-(extend-type #?(:clj clojure.lang.PersistentHashSet :cljs cljs.core/PersistentHashSet)
+(extend-type #?(:cljs cljs.core/PersistentHashSet :default clojure.lang.PersistentHashSet)
   ImplicitNav
   (implicit-nav [this] (pred this)))
 
-(extend-type #?(:clj java.util.regex.Pattern :cljs js/RegExp)
+(extend-type #?(:clj java.util.regex.Pattern
+                :cljs js/RegExp
+                :cljr System.Text.RegularExpressions.Regex)
   ImplicitNav
   (implicit-nav [this] (regex-nav this)))
 

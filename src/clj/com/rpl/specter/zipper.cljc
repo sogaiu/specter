@@ -1,8 +1,8 @@
 (ns com.rpl.specter.zipper
   #?(:cljs (:require-macros
             [com.rpl.specter
-              :refer [defnav nav declarepath providepath recursive-path]]))
-  #?(:clj
+              :refer [defnav nav declarepath providepath recursive-path]])
+     :default
      (:use
        [com.rpl.specter :only [defnav nav declarepath providepath
                                       recursive-path]]))

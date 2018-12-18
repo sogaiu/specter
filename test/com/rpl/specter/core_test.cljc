@@ -23,12 +23,25 @@
                     select-any selected-any? collected? traverse
                     multi-transform path dynamicnav recursive-path
                     defdynamicnav traverse-all satisfies-protpath? end-fn
-                    vtransform]]))
-
-
+                    vtransform]])
+    #?@(:cljr
+        [[clojure.test :only [deftest is]]
+         [clojure.test.check.clojure-test :only [defspec]]
+         [com.rpl.specter.test-helpers :only [for-all+ ic-test]]
+         [com.rpl.specter
+          :only [defprotocolpath defnav extend-protocolpath
+                 nav declarepath providepath select select-one select-one!
+                 select-first transform setval replace-in
+                 select-any selected-any? collected? traverse
+                 multi-transform path dynamicnav recursive-path
+                 defdynamicnav traverse-all satisfies-protpath? end-fn
+                 vtransform]]]))
 
   (:require #?(:clj [clojure.test.check.generators :as gen])
             #?(:clj [clojure.test.check.properties :as prop])
+            #?@(:cljr
+                [[clojure.test.check.generators :as gen]
+                 [clojure.test.check.properties :as prop]])
             #?(:cljs [clojure.test.check :as tc])
             #?(:cljs [clojure.test.check.generators :as gen])
             #?(:cljs [clojure.test.check.properties :as prop :include-macros true])
@@ -80,7 +93,7 @@
 
 
 (deftest select-one-test
-   (is (thrown? #?(:clj Exception :cljs js/Error) (select-one [s/ALL even?] [1 2 3 4])))
+   (is (thrown? #?(:cljs js/Error :default Exception) (select-one [s/ALL even?] [1 2 3 4])))
    (is (= 1 (select-one [s/ALL odd?] [2 4 1 6]))))
 
 
@@ -251,7 +264,7 @@
 
 (deftest atom-test
   (let [v (transform s/ATOM inc (atom 1))]
-    (is (instance? #?(:clj clojure.lang.Atom :cljs cljs.core/Atom) v))
+    (is (instance? #?(:cljs cljs.core/Atom :default clojure.lang.Atom) v))
     (is (= 2 (select-one s/ATOM v) @v))))
 
 (defspec view-test
@@ -457,7 +470,7 @@
 
 (deftest nil-select-one-test
   (is (= nil (select-one! s/ALL [nil])))
-  (is (thrown? #?(:clj Exception :cljs js/Error) (select-one! s/ALL []))))
+  (is (thrown? #?(:cljs js/Error :default Exception) (select-one! s/ALL []))))
 
 
 
@@ -720,7 +733,9 @@
                  [:q [:abc 3] [:ccc [:abc] [:abc "a" [:abc [:abc [:d]]]]]]))))
 
 
-#?(:clj
+#?(:cljs 'nothing
+
+   :default
    (deftest large-params-test
      (let [path (apply com.rpl.specter.impl/comp-navs (for [i (range 25)] (s/keypath i)))
            m (reduce
@@ -733,7 +748,9 @@
 ;;TODO: there's a bug in clojurescript that won't allow
 ;; non function implementations of IFn to have more than 20 arguments
 
-#?(:clj
+#?(:cljs 'nothing
+
+   :default
    (do
      (defprotocolpath AccountPath [])
      (defrecord Account [funds])
@@ -741,8 +758,9 @@
      (defrecord Family [accounts])
      (extend-protocolpath AccountPath User :account Family [:accounts s/ALL])))
 
+#?(:cljs 'nothing
 
-#?(:clj
+   :default
    (deftest protocolpath-basic-test
      (let [data [(->User (->Account 30))
                  (->User (->Account 50))
@@ -757,7 +775,9 @@
                          data))))))
 
 
-#?(:clj
+#?(:cljs 'nothing
+
+   :default
    (do
      (defprotocolpath LabeledAccountPath [label])
      (defrecord LabeledUser [account])
@@ -767,7 +787,9 @@
        LabeledFamily [:accounts (s/keypath label) s/ALL])))
 
 
-#?(:clj
+#?(:cljs 'nothing
+
+   :default
    (deftest protocolpath-params-test
      (let [data [(->LabeledUser {:a (->Account 30)})
                  (->LabeledUser {:a (->Account 50)})
@@ -782,8 +804,9 @@
                          data))))))
 
 
+#?(:cljs 'nothing
 
-#?(:clj
+   :default
    (do
      (defprotocolpath CustomWalker [])
      (extend-protocolpath CustomWalker
@@ -792,8 +815,9 @@
        clojure.lang.PersistentArrayMap [(s/keypath :a) CustomWalker]
        clojure.lang.PersistentVector [s/ALL CustomWalker])))
 
+#?(:cljs 'nothing
 
-#?(:clj
+   :default
    (deftest mixed-rich-regular-protocolpath
      (is (= [1 2 3 11 21 22 25]
             (select [CustomWalker number?] [{:a [1 2 :c [3]]} [[[[[[11]]] 21 [22 :c 25]]]]])))
@@ -801,20 +825,18 @@
             (transform [CustomWalker number?] inc [1 2 [[[3]] :b -1] {:a 3 :b 10}])))))
 
 
+#?(:cljs
+   (defn make-queue [coll]
+     (reduce
+      #(conj %1 %2)
+      #queue []
+      coll))
 
-#?(
-   :clj
+   :default
    (defn make-queue [coll]
      (reduce
        #(conj %1 %2)
        clojure.lang.PersistentQueue/EMPTY
-       coll))
-
-   :cljs
-   (defn make-queue [coll]
-     (reduce
-       #(conj %1 %2)
-       #queue []
        coll)))
 
 
@@ -976,7 +998,9 @@
   (is (= false (select-one! (s/nil->val true) false))))
 
 
-#?(:clj
+#?(:cljs 'nothing
+
+   :default
    (deftest all-map-entry
      (let [e (transform s/ALL inc (first {1 3}))]
        (is (instance? clojure.lang.MapEntry e))
@@ -1259,7 +1283,7 @@
 
 
 (deftest multi-transform-overrun-error
-  (is (thrown? #?(:clj Exception :cljs js/Error) (multi-transform s/STAY 3))))
+  (is (thrown? #?(:cljs js/Error :default Exception) (multi-transform s/STAY 3))))
 
 
 (deftest terminal-val-test
@@ -1681,16 +1705,18 @@
 
 (deftest class-constant-test
   (let [f (fn [p] (fn [v] (str p (inc v))))]
-    (is (= (str #?(:clj String :cljs js/String) 2)
-           (multi-transform (s/terminal (f #?(:clj String :cljs js/String))) 1)))
+    (is (= (str #?(:cljs js/String :default String) 2)
+           (multi-transform (s/terminal (f #?(:cljs js/String :default String))) 1)))
     ))
 
-#?(:clj
-  (do
-    (defprotocolpath FooPP)
-    (extend-protocolpath FooPP String s/STAY)
+#?(:cljs 'nothing
 
-    (deftest satisfies-protpath-test
-      (is (satisfies-protpath? FooPP "a"))
-      (is (not (satisfies-protpath? FooPP 1)))
-      )))
+   :default
+   (do
+     (defprotocolpath FooPP)
+     (extend-protocolpath FooPP String s/STAY)
+
+     (deftest satisfies-protpath-test
+       (is (satisfies-protpath? FooPP "a"))
+       (is (not (satisfies-protpath? FooPP 1)))
+       )))

@@ -9,15 +9,19 @@
   #?(:cljs (:refer-clojure :exclude [NONE]))
   (:use [com.rpl.specter.protocols :only
           [select* transform* collect-val RichNavigator]]
-        #?(:clj [com.rpl.specter.util-macros :only [doseqres mk-comp-navs]]))
+        #?(:clj [com.rpl.specter.util-macros :only [doseqres mk-comp-navs]]
+           :cljr [com.rpl.specter.util-macros :only [doseqres mk-comp-navs]]))
 
   (:require [com.rpl.specter.protocols :as p]
-            #?(:clj [clojure.pprint :as pp])
+            #?(:clj [clojure.pprint :as pp]
+               :cljr [clojure.pprint :as pp])
             [clojure.string :as s]
             [clojure.walk :as walk]
-            #?(:clj [riddley.walk :as riddley]))
+            #?(:clj [riddley.walk :as riddley]
+               :cljr [riddley.walk :as riddley]))
 
-  #?(:clj (:import [com.rpl.specter Util MutableCell])))
+  #?(:clj (:import [com.rpl.specter Util MutableCell])
+     :cljr (:import [com.rpl.specter Util MutableCell])))
 
 
 (def NONE ::NONE)
@@ -50,58 +54,56 @@
       ([a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 & r] v)))
 
 
-#?(:clj
+#?(:cljs 'nothing
+
+   :default
    (defmacro throw* [etype & args]
      `(throw (new ~etype (smart-str ~@args)))))
 
-#?(
-   :clj
+#?(:cljs
+   (defn throw-illegal* [& args]
+     (throw (js/Error. (apply str args))))
+
+   :default
    (defmacro throw-illegal [& args]
      (let [platform (if (contains? &env :locals) :cljs :clj)]
        (if (= platform :clj)
-         `(throw* IllegalArgumentException ~@args)
-         `(com.rpl.specter.impl/throw-illegal* ~@args)
-         )))
-
-   :cljs
-   (defn throw-illegal* [& args]
-     (throw (js/Error. (apply str args)))))
+         `(throw* Exception ~@args)
+         `(com.rpl.specter.impl/throw-illegal* ~@args)))))
 
 
 ;; need to get the expansion function like this so that
 ;; this code compiles in a clojure environment where cljs.analyzer
 ;; namespace does not exist
-#?(
-   :clj
-   (defn cljs-analyzer-macroexpand-1 []
-     (eval 'cljs.analyzer/macroexpand-1))
-
-;; this version is for bootstrap cljs
+#?(;; this version is for bootstrap cljs
    :cljs
    (defn cljs-analyzer-macroexpand-1 []
-     ^:cljs.analyzer/no-resolve cljs.analyzer/macroexpand-1))
+     ^:cljs.analyzer/no-resolve cljs.analyzer/macroexpand-1)
+
+   :default
+   (defn cljs-analyzer-macroexpand-1 []
+     (eval 'cljs.analyzer/macroexpand-1)))
 
 
-#?(
-   :clj
+#?(:cljs
    (defn clj-macroexpand-all [form]
-     (riddley/macroexpand-all form))
+     (throw-illegal "not implemented"))
 
-   :cljs
+   :default
    (defn clj-macroexpand-all [form]
-     (throw-illegal "not implemented")))
+     (riddley/macroexpand-all form)))
 
 
-#?(
-   :clj
-   (defn intern* [ns name val] (intern ns name val))
-
-   :cljs
+#?(:cljs
    (defn intern* [ns name val]
-     (throw-illegal "intern not supported in ClojureScript")))
+     (throw-illegal "intern not supported in ClojureScript"))
 
-#?(
-   :clj
+   :default
+   (defn intern* [ns name val] (intern ns name val)))
+
+#?(:cljs 'nothing
+
+   :default
    (defmacro fast-object-array [i]
      `(com.rpl.specter.Util/makeObjectArray ~i)))
 
@@ -111,40 +113,39 @@
    (dotimes [_ iters]
      (afn))))
 
-#?(
-   :clj
+#?(:cljs
+   (defn exec-select* [this vals structure next-fn]
+     (p/select* ^not-native this vals structure next-fn))
+
+   :default
    (defmacro exec-select* [this & args]
      (let [platform (if (contains? &env :locals) :cljs :clj)
            hinted (with-meta (gensym) {:tag 'com.rpl.specter.protocols.RichNavigator})]
        (if (= platform :cljs)
          `(p/select* ~this ~@args)
          `(let [~hinted ~this]
-            (.select* ~hinted ~@args)))))
-   :cljs
-   (defn exec-select* [this vals structure next-fn]
-     (p/select* ^not-native this vals structure next-fn)))
+            (.select* ~hinted ~@args))))))
 
 
-#?(
-   :clj
+#?(:cljs
+   (defn exec-transform* [this vals structure next-fn]
+     (p/transform* ^not-native this vals structure next-fn))
+
+   :default
    (defmacro exec-transform* [this & args]
      (let [platform (if (contains? &env :locals) :cljs :clj)
            hinted (with-meta (gensym) {:tag 'com.rpl.specter.protocols.RichNavigator})]
        (if (= platform :cljs)
          `(p/transform* ~this ~@args)
          `(let [~hinted ~this]
-            (.transform* ~hinted ~@args)))))
-
-   :cljs
-   (defn exec-transform* [this vals structure next-fn]
-     (p/transform* ^not-native this vals structure next-fn)))
+            (.transform* ~hinted ~@args))))))
 
 (defprotocol PathComposer
   (do-comp-paths [paths]))
 
 (defn rich-nav? [n]
-  #?(:clj (instance? com.rpl.specter.protocols.RichNavigator n)
-     :cljs (satisfies? RichNavigator n)))
+  #?(:cljs (satisfies? RichNavigator n)
+     :default (instance? com.rpl.specter.protocols.RichNavigator n)))
 
 (defn comp-paths* [p]
   (if (rich-nav? p) p (do-comp-paths p)))
@@ -163,7 +164,9 @@
   (coerce-path [this]
     (coerce-object this))
 
-  #?(:clj java.util.List :cljs cljs.core/PersistentVector)
+  #?(:clj java.util.List
+     :cljs cljs.core/PersistentVector
+     :cljr System.Collections.IEnumerable)
   (coerce-path [this]
     (do-comp-paths this))
 
@@ -183,7 +186,7 @@
   #?(:cljs (coerce-path [this]
             (coerce-path (into [] this))))
 
-  #?(:clj Object :cljs default)
+  #?(:cljs default :default Object)
   (coerce-path [this]
     (coerce-object this)))
 
@@ -209,10 +212,12 @@
   nil
   (do-comp-paths [o]
     (coerce-path o))
-  #?(:clj Object :cljs default)
+  #?(:cljs default :default Object)
   (do-comp-paths [o]
     (coerce-path o))
-  #?(:clj java.util.List :cljs cljs.core/PersistentVector)
+  #?(:clj java.util.List
+     :cljs cljs.core/PersistentVector
+     :cljr System.Collections.IEnumerable)
   (do-comp-paths [navigators]
     (let [coerced (map coerce-path navigators)]
       (cond (empty? coerced)
@@ -236,37 +241,33 @@
      (set_cell [this x] (set! q x))))
 
 
-#?(
-   :clj
+#?(:cljs
    (defn mutable-cell
      ([] (mutable-cell nil))
-     ([v] (MutableCell. v)))
+     ([init] (MutableCell. init)))
 
-   :cljs
+   :default
    (defn mutable-cell
      ([] (mutable-cell nil))
-     ([init] (MutableCell. init))))
+     ([v] (MutableCell. v))))
 
 
-#?(
-   :clj
-   (defn set-cell! [^MutableCell c v]
-     (.set c v))
-
-   :cljs
+#?(:cljs
    (defn set-cell! [cell val]
-     (set_cell cell val)))
+     (set_cell cell val))
+
+   :default
+   (defn set-cell! [^MutableCell c v]
+     (.set c v)))
 
 
-#?(
-   :clj
-   (defn get-cell [^MutableCell c]
-     (.get c))
-
-
-   :cljs
+#?(:cljs
    (defn get-cell [cell]
-     (.-q cell)))
+     (.-q cell))
+
+   :default
+   (defn get-cell [^MutableCell c]
+     (.get c)))
 
 
 
@@ -276,8 +277,18 @@
     (set-cell! cell ret)
     ret))
 
-#?(
-   :clj
+#?(:cljs
+   (defn compiled-traverse-with-vals* [path result-fn vals structure]
+     (exec-select*
+      path
+      vals
+      structure
+      (fn [vals structure]
+        (if (identical? vals [])
+          (result-fn structure)
+          (result-fn (conj vals structure))))))
+
+   :default
    (defmacro compiled-traverse-with-vals* [path result-fn vals structure]
      `(exec-select*
        ~path
@@ -286,29 +297,18 @@
        (fn [vals# structure#]
         (if (identical? vals# [])
           (~result-fn structure#)
-          (~result-fn (conj vals# structure#))))))
-
-   :cljs
-   (defn compiled-traverse-with-vals* [path result-fn vals structure]
-     (exec-select*
-      path
-      vals
-      structure
-      (fn [vals structure]
-       (if (identical? vals [])
-         (result-fn structure)
-         (result-fn (conj vals structure)))))))
+          (~result-fn (conj vals# structure#)))))))
 
 
 (defn compiled-traverse* [path result-fn structure]
   (compiled-traverse-with-vals* path result-fn [] structure))
 
 (defn do-compiled-traverse* [apath structure]
-  (reify #?(:clj clojure.lang.IReduce :cljs cljs.core/IReduce)
-    (#?(:clj reduce :cljs -reduce)
+  (reify #?(:cljs cljs.core/IReduce :default clojure.lang.IReduce)
+    (#?(:cljs -reduce :default reduce)
       [this afn]
-      (#?(:clj .reduce :cljs -reduce) this afn (afn)))
-    (#?(:clj reduce :cljs -reduce)
+      (#?(:cljs -reduce :default .reduce) this afn (afn)))
+    (#?(:cljs -reduce :default reduce)
       [this afn start]
       (let [cell (mutable-cell start)]
         (compiled-traverse*
@@ -323,24 +323,21 @@
         (get-cell cell)
         ))))
 
-#?(
-:clj
-(defn- call-reduce-interface [^clojure.lang.IReduce traverser afn start]
-  (.reduce traverser afn start)
-  )
+#?(:cljs
+   (defn- call-reduce-interface [^cljs.core/IReduce traverser afn start]
+     (-reduce traverser afn start))
 
-:cljs
-(defn- call-reduce-interface [^cljs.core/IReduce traverser afn start]
-  (-reduce traverser afn start)
-  ))
+   :default
+   (defn- call-reduce-interface [^clojure.lang.IReduce traverser afn start]
+     (.reduce traverser afn start)))
 
 (defn do-compiled-traverse [apath structure]
   (let [traverser (do-compiled-traverse* apath structure)]
-    (reify #?(:clj clojure.lang.IReduce :cljs cljs.core/IReduce)
-      (#?(:clj reduce :cljs -reduce)
+    (reify #?(:cljs cljs.core/IReduce :default clojure.lang.IReduce)
+      (#?(:cljs -reduce :default reduce)
         [this afn]
-        (#?(:clj .reduce :cljs -reduce) this afn (afn)))
-      (#?(:clj reduce :cljs -reduce)
+        (#?(:cljs -reduce :default .reduce) this afn (afn)))
+      (#?(:cljs -reduce :default reduce)
         [this afn start]
         (let [res (call-reduce-interface traverser afn start)]
           (unreduced res)
@@ -431,9 +428,9 @@
   (exec-transform* nav [] structure transform-fn))
 
 (defn fn-invocation? [f]
-  (or #?(:clj  (instance? clojure.lang.Cons f))
-      #?(:clj  (instance? clojure.lang.LazySeq f))
-      #?(:cljs (instance? cljs.core.LazySeq f))
+  (or #?@(:cljs [(instance? cljs.core.LazySeq f)]
+          :default [(instance? clojure.lang.Cons f)
+                    (instance? clojure.lang.LazySeq f)])
       (list? f)))
 
 (defrecord LocalSym
@@ -614,8 +611,9 @@
     (on-match-fn structure)
     (walk/walk (partial walk-until pred on-match-fn) identity structure)))
 
+#?(:cljs 'nothing
 
-#?(:clj
+   :default
    (do
     (def ^:dynamic *tmp-closure*)
     (defn closed-code [closure body]
@@ -652,8 +650,8 @@
           (closed-code closure new-form))))))
 
 (defn coerce-nav [o]
-  (cond #?(:clj (instance? com.rpl.specter.protocols.RichNavigator o)
-           :cljs (satisfies? RichNavigator o))
+  (cond #?(:cljs (satisfies? RichNavigator o)
+           :default (instance? com.rpl.specter.protocols.RichNavigator o))
         o
 
         (sequential? o)
@@ -789,44 +787,44 @@
      (mk-late-fn-records)
      (mk-late-fn)))
 
-#?(:clj
+#?(:cljs
    (defn static-fn-code [afn args]
-     `(~afn ~@args))
+     (late-fn (->StaticParam afn) args))
 
-   :cljs
+   :default
    (defn static-fn-code [afn args]
-     (late-fn (->StaticParam afn) args)))
+     `(~afn ~@args)))
 
-#?(:clj
+#?(:cljs
    (defn dynamic-fn-code [afn args]
-     `(~afn ~@args))
+     (late-fn afn args))
 
-   :cljs
+   :default
    (defn dynamic-fn-code [afn args]
-     (late-fn afn args)))
+     `(~afn ~@args)))
 
-#?(:clj
-   (defn dynamic-val-code [code possible-params]
-     code)
-
-   :cljs
+#?(:cljs
    (defn dynamic-val-code [code possible-params]
      (let [[i] (keep-indexed (fn [i v] (if (= v code) i)) possible-params)]
        (if (nil? i)
          (throw-illegal "Could not find " code " in possible params " possible-params))
        (maybe-direct-nav
         (->LocalParam i)
-        (direct-nav? code)))))
+        (direct-nav? code))))
 
-#?(:clj
-   (defn static-val-code [o]
-     o)
+   :default
+   (defn dynamic-val-code [code possible-params]
+     code))
 
-   :cljs
+#?(:cljs
    (defn static-val-code [o]
      (maybe-direct-nav
       (->StaticParam o)
-      (direct-nav? o))))
+      (direct-nav? o)))
+
+   :default
+   (defn static-val-code [o]
+     o))
 
 
 (declare resolve-nav-code)
@@ -908,17 +906,7 @@
         (if (fn? e) (re-find #" .*" (pr-str e)) e))
       o)))
 
-#?(:clj
-   (defn mk-dynamic-path-maker [resolved-code ns-str used-locals-list possible-param]
-     (let [code `(fn [~@used-locals-list] ~resolved-code)
-           ns (find-ns (symbol ns-str))]
-      (when *DEBUG-INLINE-CACHING*
-        (println "Produced code:")
-        (pp/pprint code)
-        (println))
-      (binding [*ns* ns] (eval+ code))))
-
-   :cljs
+#?(:cljs
    (defn mk-dynamic-path-maker [resolved-code ns-str used-locals-list possible-params]
      (when *DEBUG-INLINE-CACHING*
        (println "Possible params:")
@@ -927,7 +915,17 @@
        (println (mk-fn-name-strs resolved-code))
        (println))
      (fn [dynamic-params]
-       (late-resolve resolved-code dynamic-params))))
+       (late-resolve resolved-code dynamic-params)))
+
+   :default
+   (defn mk-dynamic-path-maker [resolved-code ns-str used-locals-list possible-param]
+     (let [code `(fn [~@used-locals-list] ~resolved-code)
+           ns (find-ns (symbol ns-str))]
+       (when *DEBUG-INLINE-CACHING*
+         (println "Produced code:")
+         (pp/pprint code)
+         (println))
+       (binding [*ns* ns] (eval+ code)))))
 
 
 ;; TODO: could have a global flag about whether or not to compile and cache static
