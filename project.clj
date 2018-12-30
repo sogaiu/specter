@@ -1,6 +1,4 @@
-(def VERSION (.trim (slurp "VERSION")))
-
-(defproject com.rpl/specter VERSION
+(defproject com.rpl/specter (clojure.string/trim (slurp "VERSION"))
   :jvm-opts ["-XX:-OmitStackTraceInFastThrow"] ; this prevents JVM from doing optimizations which can remove stack traces from NPE and other exceptions
              ;"-agentpath:/Applications/YourKit_Java_Profiler_2015_build_15056.app/Contents/Resources/bin/mac/libyjpagent.jnilib"]
 
